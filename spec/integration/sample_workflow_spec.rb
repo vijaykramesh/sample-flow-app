@@ -29,7 +29,7 @@ describe 'SampleWorkflow' do
   let(:swf_domain_name) { 'aws-swf-test' }
   let(:s3_bucket_name)  { 'change-test' }
   let(:s3_path)         { test_run_identifier }
-
+  let(:task_list)       { [s3_bucket_name, s3_path].join(":") }
   let(:activity_handler_pids) {
     3.times.map {
       Process.spawn({
@@ -67,9 +67,7 @@ describe 'SampleWorkflow' do
       activity_handler_pids
       decision_handler_pids
 
-      puts activity_handler_pids
-      puts decision_handler_pids
-      my_workflow_client = AWS::Flow.workflow_client(swf.client, swf.domains[swf_domain_name]) { {:from_class => "SampleWorkflow"} }
+      my_workflow_client = AWS::Flow.workflow_client(swf.client, swf.domains[swf_domain_name]) { {:from_class => "SampleWorkflow", :task_list => task_list } }
 
       workflow_execution = my_workflow_client.start_execution({ input_param: "some input" })
 
@@ -79,9 +77,7 @@ describe 'SampleWorkflow' do
 
       try_soft_loud { s3_bucket.objects.with_prefix(test_run_identifier).each {|s3_object| s3_object.delete} }
 
-    rescue Exception => e
-      puts e.inspect
-      puts e.backtrace
+    rescue AWS::Errors::MissingCredentialsError => e
       puts "NOTE: Not really running this test as we've got no AWS credentials"
     ensure
       (activity_handler_pids + decision_handler_pids).each {|pid|
